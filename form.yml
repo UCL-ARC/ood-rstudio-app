@@ -1,0 +1,45 @@
+title: "R Studio"
+cluster: "myriad"
+#submit: submit/container.yml.erb
+submit: submit.yml.erb
+attributes:
+  node_type: null
+
+  memory_gigs:
+    widget: "number_field"
+    label: "Gigabytes of memory"
+    value: 4
+    required: true
+  tmpfs_gigs:
+    widget: "number_field"
+    label: "Gigabytes of temporary on-node storage ($TMPDIR)"
+    value: 4
+    required: true
+  num_cores:
+    widget: "number_field"
+    label: "Number of CPU cores to request"
+    value: 1
+    required: true
+  num_gpus:
+    widget: "select"
+    options:
+        - ["none", "0"]
+        - ["1", "1"]
+        - ["2", "2"]
+        - ["4", "4"]
+    label: "Number of GPUs to request"
+
+form:
+    # This needs either removing or replacing, to allow for our Gold stuff
+    # - bc_account
+    # We don't use user-specified queues this way
+    #  - bc_queue
+  - bc_num_hours
+    # We'd need to use this if we were allowing MPI jobs
+    # Let's not, at least for now
+    #- bc_num_slots
+  - num_cores
+  - num_gpus
+  - memory_gigs
+  - tmpfs_gigs
+  - bc_email_on_started

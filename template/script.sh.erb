@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+
+<%
+  session_dir = session.staged_root
+  all_modules = "apptainer"
+%>
+
+source /shared/ucl/apps/modules/current/init/bash
+module purge
+
+module load <%= all_modules %>
+module list
+hostname
+
+export WORKING_DIR="<%= session_dir %>"
+echo "WORKING_DIR: $WORKING_DIR"
+
+# PAM auth helper used by RStudio
+export RSTUDIO_AUTH="$WORKING_DIR/bin/auth"
+
+# Generate an `rsession` wrapper script
+export RSESSION_WRAPPER_FILE="$WORKING_DIR/rsession.sh"
+(
+umask 077
+sed 's/^ \{2\}//' > "$WORKING_DIR/rsession.sh" << EOL
+  #!/usr/bin/env bash
+
+  session_num="\$RANDOM"
+  # Log all output from this script
+  export RSESSION_LOG_FILE="$WORKING_DIR/rsession.log.\$session_num"
+
+  exec &>>"\${RSESSION_LOG_FILE}"
+  set -x
+
+  # rsession.sh does not share the same env as the outside script, so these
+  # need to be set explicitly
+  export R_LIBS_SITE="${R_LIBS_SITE}"
+  export TZ="Europe/London"
+  export HOME="${APPTAINER_HOME:=${HOME:?no home directory???}}"
+  export MODULEPATH_ROOT="$MODULEPATH_ROOT"
+  export MODULEPATH="$MODULEPATH"
+
+  # # We do not want R packages compiled with the build env from the container
+  # #  interfering with normal R packages, so:
+  # export R_LIBS_USER="$HOME/oodR/%v/%p-library"
+
+  echo "Session env in env.session.\$session_num"
+  env >"$WORKING_DIR/env.session.\$session_num"
+
+  # Launch the original command
+  echo "Launching rsession..."
+  exec rsession --r-libs-user "${R_LIBS_USER}" "\${@}"
+EOL
+)
+chmod 700 "$WORKING_DIR/rsession.sh"
+
+# Set working directory to home directory
+cd "${HOME}"
+
+# server log directory in this job's working directory
+mkdir -p "$WORKING_DIR/logs"
+mkdir -p "$WORKING_DIR/var"
+
+set -x
+# Launch the RStudio Server
+echo "Starting up rserver... at $(date)"
+
+cd "${APPTAINER_HOME:=$HOME}"
+
+# Sets up the mechanism to alert connected user on job termination
+# Note that requires the signals to be sent by the scheduler
+# See: qsub -notify for more info
+function touch_offline_file() {
+    mkdir -p "${WORKING_DIR}/var/lib/rstudio-server"
+    touch    "${WORKING_DIR}/var/lib/rstudio-server/offline"
+}
+trap touch_offline_file SIGUSR1 SIGUSR2
+
+script_env_num="$RANDOM"
+printf "Script env in env.script.$script_env_num"
+env >"$WORKING_DIR/env.script.$script_env_num"
+
+
+# Finished setup, run R Studio container
+# Running the container like this executes the rserver binary it contains (due to container definition)
+# NB: All paths used as options to the container run are referenced from *inside* the container
+apptainer run \
+  -B "$WORKING_DIR/var":/var,/home,/lustre,/scratch,/shared,"$TMPDIR":/tmp,"$WORKING_DIR/etc":/etc/rstudio \
+/shared/ucl/apps/siflib/build/r-stud.sif \
+  --www-port "${port}" \
+  --auth-none 0 \
+  --auth-pam-helper-path "${RSTUDIO_AUTH}" \
+  --auth-encrypt-password 0 \
+  --rsession-path "${RSESSION_WRAPPER_FILE}" \
+  --database-config-file "$WORKING_DIR/etc/database.conf" \
+  --server-working-dir "$WORKING_DIR" \
+  --server-data-dir='/tmp/run' \
+  --server-user="$(whoami)"
