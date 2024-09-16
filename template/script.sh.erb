@@ -86,7 +86,7 @@ env >"$WORKING_DIR/env.script.$script_env_num"
 # NB: All paths used as options to the container run are referenced from *inside* the container
 apptainer run \
   -B "$WORKING_DIR/var":/var,/home,/lustre,/scratch,/shared,"$TMPDIR":/tmp,"$WORKING_DIR/etc":/etc/rstudio \
-/shared/ucl/apps/siflib/build/r-stud.sif \
+/shared/ucl/apps/ood-sifs/sifs/ubuntu-24.04-rstudio-2024.04.2+764-R-4.4.1.sif \
   --www-port "${port}" \
   --auth-none 0 \
   --auth-pam-helper-path "${RSTUDIO_AUTH}" \
