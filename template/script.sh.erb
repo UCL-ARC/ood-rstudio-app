@@ -39,6 +39,7 @@ sed 's/^ \{2\}//' > "$WORKING_DIR/rsession.sh" << EOL
   export HOME="${APPTAINER_HOME:=${HOME:?no home directory???}}"
   export MODULEPATH_ROOT="$MODULEPATH_ROOT"
   export MODULEPATH="$MODULEPATH"
+  export MODULESHOME="$MODULESHOME"
 
   # # We do not want R packages compiled with the build env from the container
   # #  interfering with normal R packages, so:
