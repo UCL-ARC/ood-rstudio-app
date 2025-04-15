@@ -81,12 +81,22 @@ script_env_num="$RANDOM"
 printf "Script env in env.script.$script_env_num"
 env >"$WORKING_DIR/env.script.$script_env_num"
 
+# Check for directories to bind-mount
+# Note: this is to take into account that different clusters have different per-user storage locations
+# Some locations should *always* be present, e.g. /shared, and these are not added here because
+#  if they are not detected, apptainer will fail with an error, and this is desired behaviour.
+# Also, extra commas anywhere do not cause an error. (e.g. ,,,/tmp,,,,/shared, is fine)
+export SYS_BINDS
+[[ -d "/lustre" ]] && SYS_BINDS="/lustre,"
+[[ -d "/scratch" ]] && SYS_BINDS="$SYS_BINDS/scratch,"
+[[ -d "/myriadfs" ]] && SYS_BINDS="$SYS_BINDS/myriadfs,"
+[[ -d "/acfs" ]] && SYS_BINDS="$SYS_BINDS/acfs,"
 
 # Finished setup, run R Studio container
 # Running the container like this executes the rserver binary it contains (due to container definition)
 # NB: All paths used as options to the container run are referenced from *inside* the container
 apptainer run \
-  -B "$WORKING_DIR/var":/var,/home,/lustre,/scratch,/shared,"$TMPDIR":/tmp,"$WORKING_DIR/etc":/etc/rstudio \
+  -B "$WORKING_DIR/var":/var,/home,"$SYS_BINDS",/shared,"$TMPDIR":/tmp,"$WORKING_DIR/etc":/etc/rstudio \
 /shared/ucl/apps/ood-sifs/sifs/ubuntu-24.04-rstudio-2024.04.2+764-R-4.4.1.sif \
   --www-port "${port}" \
   --auth-none 0 \
